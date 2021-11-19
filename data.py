@@ -20,7 +20,7 @@ class Data(object):
         random_map = np.arange(user_total)
         np.random.shuffle(random_map)
         overall_count = 0
-        user_file_name = '%s-data\%s' % (dataname, dataname)
+        user_file_name = '%s-data/%s' % (dataname, dataname)
         print("Loading dataset %s-data..." %(dataname))
         if not path.exists(user_file_name + '.pkl'):
             print("No existence of %s.pkl, loading data manually..." %(user_file_name))

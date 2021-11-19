@@ -2,7 +2,8 @@ import math
 import numpy as np
 
 class Adversary():
-    atk_percent = 0.01
+    atk_percent = 0.05
+    atk_size = 32
     def __init__(self, data, top_k, epsilon):
         self.data = data
         self.top_k = top_k
@@ -14,7 +15,7 @@ class Adversary():
         size = int(len(P1_data)*self.atk_percent)
         true_top_k_list = self.data.true_freq(self.top_k, P1_data)
         atk_cand_list = [] # randomly chosen items from non-top-k items as attacking items
-        while len(atk_cand_list) < 5:
+        while len(atk_cand_list) < self.atk_size:
             rand_num = np.random.randint(self.data.dict_size)
             if true_top_k_list.count(rand_num) == 0:
                 atk_cand_list.append(rand_num)

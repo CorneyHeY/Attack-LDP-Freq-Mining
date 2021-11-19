@@ -3,6 +3,7 @@ import time
 import math
 import numpy as np
 import fo
+import os
 from atk import Adversary
 
 class SVSM():
@@ -10,11 +11,24 @@ class SVSM():
     phase1_percent = 0.4
     phase2_percent = 0.1
     phase3_percent = 0.5
+    log_file = None
     def __init__(self, data, attacker, top_k, epsilon):
         self.data = data
         self.atk = attacker
         self.top_k = top_k
         self.epsilon = epsilon
+        # set log file path
+        log_path = '%s-results/' % (self.data.name)
+        if not os.path.exists(log_path):
+            os.makedirs(log_path)
+        log_time = time.strftime("%Y%m%d_%H%M", time.localtime())
+        log_prefix = "s%dp%d" % (self.atk.atk_size, int(100*self.atk.atk_percent))
+        result_file_name = '%s%s_%s-result_%s.txt' % (log_path, log_time, self.data.name, (log_prefix if self.use_atk else ""))
+        self.log_file = open(result_file_name, "w")
+
+    def print_log(str):
+        self.log_file.write(str,"\n")
+        print(str)
 
     def find(self,mode):
         n = len(self.data.data)
@@ -34,10 +48,7 @@ class SVSM():
             ncr = sum_utilities / ((self.top_k + 1) * self.top_k / 2.0)
             print("accuracy = ",accuracy)
             print("ncr = ",ncr)
-            # write into log file
-            log_time = time.strftime("%Y%m%d_%H%M", time.localtime()) 
-            result_file_name = '%s_%s-result_%s.txt' % (log_time, self.data.name, ("atk" if self.use_atk else "no_atk"))
-            fp = open(result_file_name, "w")
+            fp = self.log_file
             fp.write("#%s dataset#\n" %(self.data.name))
             fp.write("num_of_transactions = %d, num_of_categories = %d\n" %(self.data.user_total,self.data.dict_size))
             fp.write("FreqItemMining involved data - %d\n" % (single_test_user))
