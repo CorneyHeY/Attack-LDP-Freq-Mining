@@ -7,28 +7,31 @@ import os
 from atk import Adversary
 
 class SVSM():
-    use_atk = True
     phase1_percent = 0.4
     phase2_percent = 0.1
     phase3_percent = 0.5
     log_file = None
+    log_mode = 1
     def __init__(self, data, attacker, top_k, epsilon):
         self.data = data
         self.atk = attacker
         self.top_k = top_k
         self.epsilon = epsilon
-        # set log file path
-        log_path = '%s-results/' % (self.data.name)
-        if not os.path.exists(log_path):
-            os.makedirs(log_path)
-        log_time = time.strftime("%Y%m%d_%H%M", time.localtime())
-        log_prefix = "s%dp%d" % (self.atk.atk_size, int(100*self.atk.atk_percent))
-        result_file_name = '%s%s_%s-result_%s.txt' % (log_path, log_time, self.data.name, (log_prefix if self.use_atk else ""))
-        self.log_file = open(result_file_name, "w")
+        self.use_atk = attacker.atk_mode
+        if self.log_mode:
+            # set log file path
+            log_path = '%s-results/' % (self.data.name)
+            if not os.path.exists(log_path):
+                os.makedirs(log_path)
+            log_time = time.strftime("%Y%m%d_%H%M", time.localtime())
+            log_prefix = "m%ds%dp%d" % (self.atk.atk_mode, self.atk.atk_size, int(100*self.atk.atk_percent))
+            result_file_name = '%s%s_%s-result_%s.txt' % (log_path, (log_prefix if self.use_atk else ""), self.data.name, log_time)
+            self.log_file = open(result_file_name, "w")
 
     def print_log(str):
-        self.log_file.write(str,"\n")
-        print(str)
+        if self.log_file != None:
+            self.log_file.write(str,"\n")
+            print(str)
 
     def find(self,mode):
         n = len(self.data.data)
@@ -49,21 +52,24 @@ class SVSM():
             print("accuracy = ",accuracy)
             print("ncr = ",ncr)
             fp = self.log_file
-            fp.write("#%s dataset#\n" %(self.data.name))
-            fp.write("num_of_transactions = %d, num_of_categories = %d\n" %(self.data.user_total,self.data.dict_size))
-            fp.write("FreqItemMining involved data - %d\n" % (single_test_user))
-            fp.write("Attacker involved size - %d\n" % (int)(single_test_user*self.atk.atk_percent))
-            #fp.write("Phase user allocation - %.2f:%.2f:%.2f\n" % (self.phase1_percent, self.phase2_percent,, self.phase3_percent,))
-            if self.use_atk:
-                fp.write("Attacker/Users percent  - %.2f\n" % (self.atk.atk_percent))
-                fp.write("Attacking set = %s\n" % (self.atk.P1_atk_list))
-                fp.write("Phase1 Attack success = %s\n" % (self.atk.success_cand_list))
-                fp.write("Phase3 Attack success = %s\n" % (self.atk.success_item_list))
-                fp.write("Attack increment = %s\n" % (self.atk.atk_items_increment))
-                fp.write("Final attacking result = %s\n" % (self.atk.atk_items))
-                fp.write("Final result = %s\n" % (cand_items))
-            fp.write("accuracy = %f\n" % (accuracy))
-            fp.write("ncr = %f\n" % (ncr))
+            if fp !=  None:
+                fp.write("#%s dataset#\n" %(self.data.name))
+                fp.write("num_of_transactions = %d, num_of_categories = %d\n" %(self.data.user_total,self.data.dict_size))
+                fp.write("FreqItemMining involved data - %d\n" % (single_test_user))
+                fp.write("Attacker involved size - %d\n" % (int)(single_test_user*self.atk.atk_percent))
+                #fp.write("Phase user allocation - %.2f:%.2f:%.2f\n" % (self.phase1_percent, self.phase2_percent,, self.phase3_percent,))
+                if self.use_atk:
+                    fp.write("Attacker/Users percent  - %.2f\n" % (self.atk.atk_percent))
+                    fp.write("Attacking set = %s\n" % (self.atk.P1_atk_list))
+                    fp.write("Attack mode = max_gain\n")
+                    fp.write("Phase1 Attack success = %s\n" % (self.atk.success_cand_list))
+                    fp.write("Phase1 Attack increment = %s\n" % (self.atk.P1_atk_increment))
+                    fp.write("Phase3 Attack success = %s\n" % (self.atk.success_item_list))
+                    fp.write("Phase3 Attack increment = %s\n" % (self.atk.P3_atk_increment))
+                    fp.write("Final attack targets result = %s\n" % (self.atk.P3_final_freq))
+                    fp.write("Final result = %s\n" % (cand_items))
+                fp.write("accuracy = %f\n" % (accuracy))
+                fp.write("ncr = %f\n" % (ncr))
             return cand_items
         else:
             cand_itemsets = self.find_itemset(key_list, est_freq, single_test_user, n)
@@ -82,12 +88,13 @@ class SVSM():
         print("precentage of phase3_user = %.2f" %(len(phase3_user)*1.0/single_test_user))
         # step 1: find singleton candidate set
         print("Phase1: find singleton candidate set")
-        phase1_atk = self.atk.P1_atk(phase1_user)
+        phase1_atk_samples = self.atk.P1_atk(phase1_user)
         #phase1_data = phase1_user+phase1_atk if self.use_atk else phase1_user
-        true_user_dist = self.test_single(phase1_user)
-        true_atk_dist = self.test_single(phase1_atk)
-        est_user_dist = fo.lh(true_user_dist, self.epsilon)
-        est_atk_dist = fo.lh(true_atk_dist, self.epsilon)
+        true_user_dist = self.data.test_single(phase1_user)
+        domain = len(true_user_dist)
+        LH1 = fo.LH(domain, self.epsilon)
+        est_user_dist = LH1.lh(true_user_dist)
+        est_atk_dist = LH1.lh_aggregate(phase1_atk_samples)
         est_singleton_dist = []
         for i in range(len(est_user_dist)):
             est_singleton_dist.append(est_user_dist[i] + est_atk_dist[i])
@@ -105,7 +112,7 @@ class SVSM():
             key_result[(singleton_list[i],)] = i
 
         length_percentile = 0.9
-        length_distribution = self.test_length_singleton(phase2_data, len(singleton_list),
+        length_distribution = self.find_length_singleton(phase2_data, len(singleton_list),
                                                          singleton_list)
         length_limit = self.find_percentile_set(length_distribution, length_percentile)
 
@@ -114,19 +121,21 @@ class SVSM():
         phase3_atk = self.atk.P3_atk(phase3_user)
         #phase3_data = phase3_user+phase3_atk if self.use_atk else phase3_user
         use_grr, eps = self.set_grr(key_result, length_limit)
-        true_user_dist = self.test_singleton_cand_limit(phase3_user, key_result, set(singleton_list), length_limit)
-        true_atk_dist = self.test_singleton_cand_limit(phase3_atk, key_result, set(singleton_list), length_limit)
+        true_user_dist = self.data.test_singleton_cand_limit(phase3_user, key_result, set(singleton_list), length_limit)
+        true_atk_dist = self.data.test_singleton_cand_limit(phase3_atk, key_result, set(singleton_list), length_limit)
         
         if use_grr:
-            user_value_estimates = fo.rr(true_user_dist, eps)[:-1]
-            atk_value_estimates = fo.rr(true_atk_dist, eps)[:-1]
+            RR = fo.RR(len(true_user_dist), eps)
+            user_value_estimates = RR.rr(true_user_dist)[:-1]
+            atk_value_estimates = RR.rr(true_atk_dist)[:-1]
         else:
-            user_value_estimates = fo.lh(true_user_dist, eps)[:-1]
-            atk_value_estimates = fo.lh(true_atk_dist, eps)[:-1]
+            LH3 = fo.LH(len(true_user_dist), eps)
+            user_value_estimates = LH3.lh(true_user_dist)[:-1]
+            atk_value_estimates = LH3.lh(true_atk_dist)[:-1]
         value_estimates = np.array(user_value_estimates)
         for i in range(len(user_value_estimates)):
             value_estimates[i] += atk_value_estimates[i]
-        total_user = single_test_user+len(phase1_atk)+len(phase2_atk)+len(phase3_atk)
+        total_user = single_test_user + int(single_test_user*self.atk.atk_percent)
         factor = total_user / length_percentile / (len(phase3_user)+len(phase3_atk))
         value_estimates *= total_user / length_percentile / (len(phase3_user)+len(phase3_atk))
 
@@ -164,106 +173,6 @@ class SVSM():
 
         return self.build_set_result(singletons, singleton_freq, set_freq, set_cand_dict_inv)
 
-    # ===== singleton testing methods
-    def test_single(self, data):
-        """ every user report a random item from all its items with no padding """
-        results = np.zeros(self.data.dict_size, dtype=np.int)
-        for i in range(len(data)):
-            if len(data[i]) == 0:
-                continue
-            rand_index = np.random.randint(len(data[i]))
-            value = data[i][rand_index]
-            results[value] += 1
-        return results
-    
-    def test_length_cand(self, data, cand_list, limit, start_limit=0):
-        """ every user report the length of its intersection with candidate set """
-        results = np.zeros(limit - start_limit + 1, dtype=np.int)
-        cand_set = set(cand_list)
-        for i in range(len(data)):
-            X = data[i]
-            # V = cand_set.intersection(X)
-            # value = len(V)
-            value = 0
-            for item in X:
-                if item in cand_set:
-                    value += 1
-            if value <= start_limit:
-                continue
-            if value > limit:
-                value = start_limit
-            results[value - start_limit] += 1
-        return results
-
-    def test_singleton_cand_limit(self, data, key_dict, singleton_set, length_limit):
-        results = np.zeros(len(singleton_set) + 1, dtype=np.int)
-        for i in range(len(data)):
-            values = [] # set of intersected items 
-            x = data[i]
-            for item in x:
-                if item in singleton_set:
-                    values.append(item)
-            if len(values) > length_limit:
-                rand_index = np.random.randint(len(values))
-                result = key_dict[(values[rand_index],)]
-            else:
-                rand_index = np.random.randint(length_limit)
-                result = len(singleton_set)
-                if rand_index < len(values):
-                    result = key_dict[(values[rand_index],)]
-            results[result] += 1
-        return results
-
-    # ===== itemset testing methods
-    def test_length_itemset(self, data, cand_dict, limit, start_limit=0):
-        results = np.zeros(limit - start_limit + 1, dtype=np.int)
-        singleton_set = set()
-        for cand in cand_dict:
-            singleton_set = singleton_set.union(set(cand))
-        for i in range(len(data)):
-            current_set = singleton_set.intersection(set(data[i]))
-            if len(current_set) == 0:
-                continue
-            value = 0
-            for cand in cand_dict:
-                if set(cand) <= current_set:
-                    value += 1
-            if value <= start_limit:
-                continue
-            if value > limit:
-                value = start_limit
-            results[value - start_limit] += 1
-        return results
-
-    def test_cand_limit(self, data, cand_dict, length_limit):
-        buckets = np.zeros(len(cand_dict) + 1, dtype=np.int)
-        singleton_set = set()
-        for cand in cand_dict:
-            singleton_set = singleton_set.union(set(cand))
-
-        for i in range(len(data)):
-            current_set = singleton_set.intersection(set(data[i]))
-            if len(current_set) == 0:
-                continue
-            subset_count = 0
-            subset_indices = []
-            for cand in cand_dict:
-                if set(cand) <= current_set:
-                    subset_count += 1
-                    subset_indices.append(cand_dict[cand])
-
-            if subset_count > length_limit:
-                rand_index = np.random.randint(subset_count)
-                result = subset_indices[rand_index]
-            else:
-                rand_index = np.random.randint(length_limit)
-                result = len(cand_dict)
-                if rand_index < subset_count:
-                    result = subset_indices[rand_index]
-
-            buckets[result] += 1
-        return buckets
-
     # ===== auxiliary functions for singletons
     def build_result(self, value_estimates, key_list, top_singleton):
         sorted_indices = np.argsort(value_estimates)
@@ -294,9 +203,10 @@ class SVSM():
             use_grr = True
         return use_grr, eps
 
-    def test_length_singleton(self, user_data, length_limit, cand_dict):
-        true_length_dist = self.test_length_cand(user_data, cand_dict, length_limit)
-        est_length_dist = fo.lh(true_length_dist, self.epsilon)
+    def find_length_singleton(self, user_data, length_limit, cand_dict):
+        true_length_dist = self.data.test_length_cand(user_data, cand_dict, length_limit)
+        LH = fo.LH(len(true_length_dist), self.epsilon)
+        est_length_dist = LH.lh(true_length_dist)
         return est_length_dist
 
     # ===== auxiliary functions for itemset: constructing candidate set
