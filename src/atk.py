@@ -6,7 +6,7 @@ import fo
 class Adversary():
     # 0: no atk 1: chosen_item_atk 2: weak max-gain atk 3: max-gain atk
     atk_mode = 3 
-    atk_percent = 0.01
+    atk_percent = 0.03
     atk_size = 32
     def __init__(self, data, top_k, epsilon):
         self.data = data
